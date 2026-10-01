@@ -1,0 +1,39 @@
+{
+  "id": "chatbotapp",
+  "displayName": "Chatbot App",
+  "baseUrl": "https://chat.chatbotapp.ai",
+  "jira": {
+    "projectKey": "CW",
+    "boardId": 362
+  },
+  "sourceRepository": {
+    "repository": "hubxco/fe-chatbot",
+    "baseRef": "development",
+    "diffBase": "origin/main",
+    "headRef": "HEAD"
+  },
+  "capabilities": ["chat", "images", "documents", "apps", "projects", "search"],
+  "auth": {
+    "required": true,
+    "storageState": "artifacts/auth/chatbotapp.json"
+  },
+  "ignoredConsoleErrorPatterns": ["Provider's accounts list is empty.", "FedCM get() rejects with NetworkError: Error retrieving a token."],
+  "locators": {
+    "primaryInput": { "kind": "placeholder", "value": "Ask anything..." },
+    "sendButton": { "kind": "role", "role": "button", "name": "Send message" },
+    "sidebarButton": { "kind": "role", "role": "button", "name": "Open sidebar" },
+    "sidebarLinks": ["New Chat", "Images", "Documents", "Apps", "Projects", "Search Chat"]
+  },
+  "exploration": {
+    "allowGeneration": false,
+    "maxActions": 30,
+    "maxDurationMs": 20000,
+    "safePathPrefixes": ["/", "/chats/", "/images", "/documents", "/apps", "/projects", "/search"]
+  },
+  "explorbot": {
+    "targetPath": "",
+    "maxTests": 3,
+    "knowledgeFile": "artifacts/explorbot/knowledge.md",
+    "allowedActions": ["navigate", "open-modal", "type", "click", "scroll", "refresh", "go-back"]
+  }
+}

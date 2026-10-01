@@ -1,0 +1,145 @@
+name: Sprint Exploratory Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_id:
+        description: App config id under apps/
+        required: true
+        default: chatbotapp
+      allow_generation:
+        description: Allow bounded generation actions that may consume quota
+        required: true
+        default: "false"
+      headed:
+        description: Run with a virtual display for headed browser video
+        required: true
+        default: "false"
+      issue_key:
+        description: Optional Jira issue key for a task-specific report, for example CW-1819
+        required: false
+        default: ""
+      run_explorbot:
+        description: Run the optional Explorbot AI exploration after mission generation
+        required: true
+        default: "false"
+      explorbot_target_path:
+        description: Explicit safe app path for Explorbot, for example /chats/123
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 16 * * 1-5"
+
+jobs:
+  exploratory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY || 'CW' }}
+      JIRA_BOARD_ID: ${{ vars.JIRA_BOARD_ID || '362' }}
+      JIRA_ISSUE_KEY: ${{ inputs.issue_key || vars.JIRA_ISSUE_KEY || '' }}
+      APP_ID: ${{ inputs.app_id || vars.APP_ID || 'chatbotapp' }}
+      ALLOW_GENERATION_TESTS: ${{ inputs.allow_generation || 'false' }}
+      APP_BASE_URL: ${{ vars.APP_BASE_URL || 'https://chat.chatbotapp.ai' }}
+      MONKEY_SEED: ${{ github.run_number }}
+      AUTH_STORAGE_STATE_B64: ${{ secrets.AUTH_STORAGE_STATE_B64 }}
+      HEADED: ${{ inputs.headed || 'false' }}
+      EXPLORBOT_ENABLED: ${{ inputs.run_explorbot || 'false' }}
+      EXPLORBOT_TARGET_PATH: ${{ inputs.explorbot_target_path || vars.EXPLORBOT_TARGET_PATH || '' }}
+      EXPLORBOT_AI_PROVIDER: ${{ vars.EXPLORBOT_AI_PROVIDER || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate required configuration
+        shell: bash
+        env:
+          REQUIRED_JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          REQUIRED_JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          REQUIRED_JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: |
+          missing=0
+          for name in REQUIRED_JIRA_BASE_URL REQUIRED_JIRA_EMAIL REQUIRED_JIRA_API_TOKEN; do
+            if [ -z "${!name}" ]; then
+              echo "::error title=Missing configuration::$name is not configured in GitHub Actions secrets"
+              missing=1
+            fi
+          done
+          exit "$missing"
+      - run: npm install
+      - run: npx playwright install --with-deps chromium
+      - run: npm run typecheck
+      - name: Prepare optional authenticated session
+        if: ${{ env.AUTH_STORAGE_STATE_B64 != '' }}
+        run: |
+          mkdir -p artifacts/auth
+          printf '%s' "$AUTH_STORAGE_STATE_B64" | base64 --decode > artifacts/auth/chatbotapp.json
+      - name: Generate baseline mission and cases
+        if: ${{ env.EXPLORBOT_ENABLED != 'true' }}
+        run: npm run generate
+      - name: Install Explorbot when explicitly enabled
+        if: ${{ env.EXPLORBOT_ENABLED == 'true' }}
+        run: npm install explorbot --no-save
+      - name: Run optional Explorbot exploration
+        if: ${{ env.EXPLORBOT_ENABLED == 'true' }}
+        run: npm run explorbot:run
+      - name: Run Playwright suite
+        shell: bash
+        run: |
+          if [ "$HEADED" = "true" ]; then
+            xvfb-run --auto-servernum --server-args="-screen 0 1440x900x24" npm test
+          else
+            npm test
+          fi
+      - name: Convert recordings to compatible MP4 files
+        if: always()
+        shell: bash
+        run: |
+          ffmpeg_path="$(command -v ffmpeg || true)"
+          if [ -z "$ffmpeg_path" ]; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+            ffmpeg_path="$(command -v ffmpeg || true)"
+          fi
+          if [ -z "$ffmpeg_path" ]; then
+            echo "System FFmpeg was not found; retaining WebM recordings."
+            exit 0
+          fi
+          find test-results playwright-report -type f -name '*.webm' -exec bash -c '
+            for video do
+              output="${video%.webm}.mp4"
+              "$0" -y -loglevel error -i "$video" -an -c:v libx264 -pix_fmt yuv420p -f mp4 "$output"
+            done
+          ' "$ffmpeg_path" {} +
+      - name: Build readable evidence bundle
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts/evidence
+          printf '%s\n\n' '# Readable test evidence' > artifacts/evidence/README.md
+          printf '%s\n\n' 'Open the PNG for the final captured state or the MP4 for the full recording. These files are copied from the individual Playwright test results and have stable names.' >> artifacts/evidence/README.md
+          for result in test-results/*; do
+            [ -d "$result" ] || continue
+            name="$(basename "$result")"
+            if [ -f "$result/test-finished-1.png" ]; then
+              cp "$result/test-finished-1.png" "artifacts/evidence/$name.png"
+              printf '%s' "- [$name screenshot]($name.png)" >> artifacts/evidence/README.md
+              if [ -f "$result/video.mp4" ]; then
+                cp "$result/video.mp4" "artifacts/evidence/$name.mp4"
+                printf '%s' " | [MP4 recording]($name.mp4)" >> artifacts/evidence/README.md
+              fi
+              printf '\n' >> artifacts/evidence/README.md
+            fi
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exploratory-test-results
+          path: |
+            artifacts/
+            playwright-report/
+            test-results/

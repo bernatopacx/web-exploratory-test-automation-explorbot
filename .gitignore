@@ -1,0 +1,12 @@
+node_modules/
+work/
+dist/
+playwright-report/
+test-results/
+.env
+artifacts/auth/
+artifacts/explorbot/
+artifacts/*.json
+artifacts/*
+!artifacts/.gitkeep
+!artifacts/.gitkeep
