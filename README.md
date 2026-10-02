@@ -128,6 +128,8 @@ The workflow still uploads the normal Playwright screenshots, videos, traces, an
 
 ## Delivery documents
 
+- `docs/PROJECT_ARCHITECTURE_EXPLORBOT.md`: Explorbot entegrasyonu sonrasi mission, runner, guvenlik ve kosum akisi.
+
 - `docs/OKR_DELIVERY_REPORT.md`: OKR teslim raporu, son kosum metrikleri ve sonraki fazlar.
 - `docs/HANDOFF_GUIDE.md`: lokal ve GitHub Actions calistirma rehberi.
 - `docs/EVIDENCE_INDEX.md`: son kosum screenshot ve video kanitlarinin index'i.
