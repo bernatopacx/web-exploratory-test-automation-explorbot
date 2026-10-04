@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 import { loadAppConfig, resolveFromRoot } from "../src/config/loader.js";
 import type { CaseDocument, GeneratedCase } from "../src/cases/types.js";
 import { runSafeMonkey } from "../src/exploration/monkey.js";
-import { runInputFocusProbe, openSidebar } from "../src/exploration/actions.js";
+import { locate, runInputFocusProbe, openSidebar } from "../src/exploration/actions.js";
 import { attachRuntimeOracles, assertNoRuntimeErrors } from "../src/exploration/oracles.js";
 
 function loadCases(): CaseDocument {
@@ -22,6 +22,7 @@ for (const generatedCase of cases) {
     const app = await loadAppConfig();
     const runtime = attachRuntimeOracles(page, app.ignoredConsoleErrorPatterns);
     await page.goto(app.baseUrl, { waitUntil: "domcontentloaded" });
+    await expect(locate(page, app.locators.primaryInput)).toBeVisible({ timeout: 15000 });
     if (generatedCase.category === "monkey") await runSafeMonkey(page, app);
     if (generatedCase.tags.includes("input")) await runInputFocusProbe(page, app);
     if (generatedCase.tags.includes("navigation")) await openSidebar(page, app);
