@@ -57,7 +57,7 @@ open artifacts/task-cw-1819.html
 
 When `JIRA_ISSUE_KEY` is set, the generated Playwright inventory uses the task-specific JSON file, so the test titles and evidence are scoped to that issue. Without it, the normal sprint inventory is used.
 
-Set `JIRA_EMAIL` and `JIRA_API_TOKEN` locally. Never commit them. For authenticated apps, create a Playwright storage state file outside git and point `AUTH_STORAGE_STATE` to it.
+Set `JIRA_EMAIL` and `JIRA_API_TOKEN` locally. Never commit them. For authenticated apps, create a Playwright storage state file outside git and point `AUTH_STORAGE_STATE` to it. In GitHub Actions, use the repository secrets and `SOURCE_REPOSITORY_TOKEN` described above instead of local credential files.
 
 Jira requests use a 15-second timeout and two bounded retries by default. Override `JIRA_REQUEST_TIMEOUT_MS` when a project needs a different network budget.
 
@@ -69,7 +69,7 @@ Copy `apps/chatbotapp.json`, change the URL, Jira project key/board id, capabili
 
 ## CI inputs
 
-Configure `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN` as GitHub Secrets. `AUTH_STORAGE_STATE_B64` is required for authenticated app surfaces. Code intelligence is currently a local-only input: set `SOURCE_REPO_PATH` to the local project directory. Git metadata is used when available; the extracted ZIP is scanned as a local source tree.
+Configure `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN` as GitHub Secrets. `AUTH_STORAGE_STATE_B64` is required for authenticated app surfaces. On GitHub Actions, code intelligence reads the fresh FE/BE checkouts under `work/repos/` and records their resolved SHAs. For local runs, set `*_SOURCE_REPO_PATH` (or the legacy `SOURCE_REPO_PATH`) to an existing checkout; Git metadata is used when available and an extracted ZIP is scanned as a local source tree.
 
 For private FE/BE repositories, configure `SOURCE_REPOSITORY_TOKEN` as a read-only GitHub Secret with access to both source repositories. The workflow checks out the configured frontend and backend refs before generating cases, so every run analyzes fresh source instead of a stale copy. Set `FRONTEND_REPOSITORY`, `FRONTEND_REF`, `BACKEND_REPOSITORY`, and `BACKEND_REF` as repository variables when the defaults differ. The workflow also accepts the `source-repository-updated` `repository_dispatch` event; source repositories can call it after a push when immediate QA is desired. The existing schedule remains the fallback.
 
