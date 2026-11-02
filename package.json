@@ -9,6 +9,7 @@
   },
   "scripts": {
     "discover": "tsx src/cli.ts discover",
+    "sync:repos": "tsx src/cli.ts sync",
     "generate": "tsx src/cli.ts generate",
     "analyze:code": "tsx src/cli.ts discover",
     "explore": "tsx src/cli.ts explore",

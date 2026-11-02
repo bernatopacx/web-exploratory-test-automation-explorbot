@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Exploratory QA"
+  short_description: "Run evidence-backed web release and exploratory QA"
+  default_prompt: "Use $release-exploratory-qa to turn this Jira feature into cases, run evidence-backed checks, and produce a coverage report."

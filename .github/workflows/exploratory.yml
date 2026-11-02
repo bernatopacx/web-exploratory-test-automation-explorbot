@@ -27,6 +27,8 @@ on:
         description: Explicit safe app path for Explorbot, for example /chats/123
         required: false
         default: ""
+  repository_dispatch:
+    types: [source-repository-updated]
   schedule:
     - cron: "0 16 * * 1-5"
 
@@ -40,7 +42,7 @@ jobs:
       JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
       JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY || 'CW' }}
       JIRA_BOARD_ID: ${{ vars.JIRA_BOARD_ID || '362' }}
-      JIRA_ISSUE_KEY: ${{ inputs.issue_key || vars.JIRA_ISSUE_KEY || '' }}
+      JIRA_ISSUE_KEY: ${{ github.event.client_payload.issue_key || inputs.issue_key || vars.JIRA_ISSUE_KEY || '' }}
       APP_ID: ${{ inputs.app_id || vars.APP_ID || 'chatbotapp' }}
       ALLOW_GENERATION_TESTS: ${{ inputs.allow_generation || 'false' }}
       APP_BASE_URL: ${{ vars.APP_BASE_URL || 'https://chat.chatbotapp.ai' }}
@@ -50,8 +52,25 @@ jobs:
       EXPLORBOT_ENABLED: ${{ inputs.run_explorbot || 'false' }}
       EXPLORBOT_TARGET_PATH: ${{ inputs.explorbot_target_path || vars.EXPLORBOT_TARGET_PATH || '' }}
       EXPLORBOT_AI_PROVIDER: ${{ vars.EXPLORBOT_AI_PROVIDER || '' }}
+      SYNC_SOURCE_REPOS: "false"
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout frontend source for code intelligence
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.FRONTEND_REPOSITORY || 'hubxco/fe-chatbot' }}
+          ref: ${{ vars.FRONTEND_REF || 'development' }}
+          path: work/repos/fe-chatbot
+          fetch-depth: 0
+          token: ${{ secrets.SOURCE_REPOSITORY_TOKEN || github.token }}
+      - name: Checkout backend source for code intelligence
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.BACKEND_REPOSITORY || 'hubxco/be-chatbot-wl' }}
+          ref: ${{ vars.BACKEND_REF || 'main' }}
+          path: work/repos/be-chatbot-wl
+          fetch-depth: 0
+          token: ${{ secrets.SOURCE_REPOSITORY_TOKEN || github.token }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24

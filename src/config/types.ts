@@ -11,6 +11,14 @@ export type AppConfig = {
   baseUrl: string;
   jira: { projectKey: string; boardId: number };
   sourceRepository?: { repository: string; baseRef: string; diffBase?: string; headRef?: string; path?: string };
+  sourceRepositories?: Array<{
+    id: string;
+    repository: string;
+    ref: string;
+    path: string;
+    diffBase?: string;
+    headRef?: string;
+  }>;
   capabilities: string[];
   auth: { required: boolean; storageState?: string };
   ignoredConsoleErrorPatterns?: string[];

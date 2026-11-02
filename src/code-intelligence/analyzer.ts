@@ -33,6 +33,8 @@ export type CodeIntelligenceDocument = {
   message?: string;
 };
 
+export type RepositoryAnalysisInput = AnalyzerOptions & { id: string };
+
 type AnalyzerOptions = {
   sourcePath?: string;
   repository?: string;
@@ -199,4 +201,49 @@ export async function analyzeSourceRepository(options: AnalyzerOptions): Promise
   } catch (error) {
     return unavailable(`Unable to analyze source repository refs ${baseRef}..${headRef}: ${String(error)}`);
   }
+}
+
+export async function analyzeSourceRepositories(inputs: RepositoryAnalysisInput[]): Promise<CodeIntelligenceDocument> {
+  if (!inputs.length) {
+    return {
+      status: "unavailable",
+      repository: "unconfigured",
+      sourcePath: "",
+      baseRef: "unconfigured",
+      headRef: "unconfigured",
+      changedFiles: [],
+      signals: [],
+      generatedAt: new Date().toISOString(),
+      message: "No source repositories are configured."
+    };
+  }
+  const documents = await Promise.all(inputs.map(input => analyzeSourceRepository(input)));
+  const grouped = new Map<string, CodeSignal>();
+  const changedFiles: CodeChange[] = [];
+  for (const [index, document] of documents.entries()) {
+    const source = inputs[index];
+    for (const file of document.changedFiles) changedFiles.push({ ...file, path: `${source.id}/${file.path}` });
+    for (const signal of document.signals) {
+      const current = grouped.get(signal.tag) ?? { tag: signal.tag, files: [], evidence: [] };
+      for (const file of signal.files) {
+        const qualified = `${source.id}/${file}`;
+        if (!current.files.includes(qualified)) current.files.push(qualified);
+      }
+      for (const evidence of signal.evidence) current.evidence.push(`${source.id}/${evidence}`);
+      grouped.set(signal.tag, current);
+    }
+  }
+  const ready = documents.some(document => document.status === "ready");
+  const empty = documents.some(document => document.status === "empty");
+  return {
+    status: ready ? "ready" : empty ? "empty" : "unavailable",
+    repository: documents.map(document => document.repository).join(", "),
+    sourcePath: documents.map(document => document.sourcePath).join(", "),
+    baseRef: "configured-repositories",
+    headRef: "configured-repositories",
+    changedFiles,
+    signals: [...grouped.values()],
+    generatedAt: new Date().toISOString(),
+    message: documents.map(document => document.message).filter(Boolean).join(" ") || undefined
+  };
 }

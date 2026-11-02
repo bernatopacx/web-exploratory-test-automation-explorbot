@@ -12,6 +12,24 @@
     "diffBase": "origin/main",
     "headRef": "HEAD"
   },
+  "sourceRepositories": [
+    {
+      "id": "frontend",
+      "repository": "hubxco/fe-chatbot",
+      "ref": "development",
+      "path": "work/repos/fe-chatbot",
+      "diffBase": "origin/main",
+      "headRef": "HEAD"
+    },
+    {
+      "id": "backend",
+      "repository": "hubxco/be-chatbot-wl",
+      "ref": "main",
+      "path": "work/repos/be-chatbot-wl",
+      "diffBase": "origin/main",
+      "headRef": "HEAD"
+    }
+  ],
   "capabilities": ["chat", "images", "documents", "apps", "projects", "search"],
   "auth": {
     "required": true,

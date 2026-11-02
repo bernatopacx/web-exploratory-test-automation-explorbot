@@ -4,9 +4,10 @@ import { loadAppConfig, resolveFromRoot } from "./config/loader.js";
 import { discoverActiveSprintSnapshot, fetchIssue } from "./jira/client.js";
 import { generateCases, generateTaskCases } from "./cases/generator.js";
 import { renderCaseHtml, renderCaseSummary } from "./cases/report.js";
-import { analyzeSourceRepository } from "./code-intelligence/analyzer.js";
+import { analyzeSourceRepositories } from "./code-intelligence/analyzer.js";
 import { buildExplorbotMission, writeExplorbotMission } from "./explorbot/mission.js";
 import { runExplorbot } from "./explorbot/runner.js";
+import { resolveSourceRepositories, syncSourceRepositories } from "./repos/sync.js";
 
 async function main(): Promise<void> {
   const command = process.argv[2] ?? "generate";
@@ -14,17 +15,29 @@ async function main(): Promise<void> {
   const projectKey = process.env.JIRA_PROJECT_KEY ?? config.jira.projectKey;
   const boardId = Number(process.env.JIRA_BOARD_ID ?? config.jira.boardId);
 
-  if (!["discover", "generate", "explore"].includes(command)) throw new Error(`Unknown command: ${command}. Use discover, generate, or explore.`);
+  if (!["discover", "generate", "explore", "sync"].includes(command)) throw new Error(`Unknown command: ${command}. Use discover, generate, explore, or sync.`);
+  const syncRequested = command === "sync" || process.env.SYNC_SOURCE_REPOS === "true";
+  const sourceRepositories = resolveSourceRepositories(config);
+  const repositoryManifest = await syncSourceRepositories(config, syncRequested);
+  console.log(`Source repositories: ${repositoryManifest.repositories.map(repository => `${repository.id}=${repository.status}@${repository.headSha ?? "unknown"}`).join(", ") || "none configured"}.`);
+  if (command === "sync") {
+    const failed = repositoryManifest.repositories.filter(repository => ["missing", "unavailable"].includes(repository.status));
+    if (failed.length) throw new Error(`Source repository sync failed: ${failed.map(repository => `${repository.id}: ${repository.message ?? repository.status}`).join("; ")}`);
+    return;
+  }
   const snapshot = await discoverActiveSprintSnapshot(projectKey, boardId);
   await fs.writeFile(resolveFromRoot("artifacts/active-sprint.json"), JSON.stringify(snapshot, null, 2));
   console.log(`Discovered ${snapshot.issues.length} issue(s) from ${snapshot.sprint.name}.`);
-  const source = config.sourceRepository;
-  const code = await analyzeSourceRepository({
-    sourcePath: process.env.SOURCE_REPO_PATH ?? source?.path,
-    repository: process.env.SOURCE_REPO ?? source?.repository,
-    baseRef: process.env.SOURCE_REPO_DIFF_BASE ?? source?.diffBase ?? "origin/main",
-    headRef: process.env.SOURCE_REPO_DIFF_HEAD ?? source?.headRef ?? "HEAD"
-  });
+  const code = await analyzeSourceRepositories(sourceRepositories.map(source => {
+    const prefix = source.id.replace(/[^a-z0-9]+/gi, "_").toUpperCase();
+    return {
+      id: source.id,
+      sourcePath: process.env[`${prefix}_SOURCE_REPO_PATH`] ?? (source.id === "frontend" ? process.env.SOURCE_REPO_PATH : undefined) ?? source.path,
+      repository: source.repository,
+      baseRef: process.env[`${prefix}_DIFF_BASE`] ?? (source.id === "frontend" ? process.env.SOURCE_REPO_DIFF_BASE : undefined) ?? source.diffBase ?? `origin/${source.ref}`,
+      headRef: process.env[`${prefix}_DIFF_HEAD`] ?? (source.id === "frontend" ? process.env.SOURCE_REPO_DIFF_HEAD : undefined) ?? source.headRef ?? "HEAD"
+    };
+  }));
   await fs.writeFile(resolveFromRoot("artifacts/code-intelligence.json"), JSON.stringify(code, null, 2));
   console.log(`Code intelligence: ${code.status}; ${code.changedFiles.length} changed file(s), ${code.signals.length} risk signal(s).`);
   if (command === "generate" || command === "explore") {

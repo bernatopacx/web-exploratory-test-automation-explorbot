@@ -12,6 +12,8 @@ Reusable Playwright infrastructure for sprint-based smoke, exploratory, and boun
 6. Generate stable, implementation-agnostic test charters under `artifacts/generated-cases.json`.
 7. Execute the generic smoke, exploratory, and monkey probes with Playwright.
 
+The configured frontend and backend repositories are checked out into `work/repos/` for each GitHub Actions run. The exact source commit for every run is recorded in `artifacts/source-repositories.json`; the QA repository does not copy source code into its own history.
+
 The generator deliberately does not turn every acceptance criterion into a brittle feature assertion. It uses sprint text and code changes to select risk dimensions such as navigation, focus, persistence, async interruption, responsive behavior, and authentication recovery. Localization is intentionally out of scope for this phase.
 
 App profiles may define a narrow `ignoredConsoleErrorPatterns` list for known third-party browser noise. Each entry should be justified by the local source review; all other page errors and console errors remain test failures.
@@ -34,6 +36,14 @@ SOURCE_REPO=hubxco/fe-chatbot \
 SOURCE_REPO_DIFF_BASE=origin/main \
 npm run generate
 ```
+
+To refresh managed source checkouts locally and record their commit SHAs:
+
+```bash
+npm run sync:repos
+```
+
+The default `chatbotapp` profile tracks `hubxco/fe-chatbot` at `development` and `hubxco/be-chatbot-wl` at `main`. Override a source without changing the profile with variables such as `FRONTEND_REF`, `BACKEND_REF`, `FRONTEND_REPOSITORY`, or `BACKEND_REPOSITORY`. A source path explicitly supplied through `*_SOURCE_REPO_PATH` is inspected but is never rewritten by the sync command.
 
 Use `HEADED=true npm test` to run with a visible browser. The same run still records screenshots, video, trace, HTML, and JSON results.
 
@@ -60,6 +70,8 @@ Copy `apps/chatbotapp.json`, change the URL, Jira project key/board id, capabili
 ## CI inputs
 
 Configure `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN` as GitHub Secrets. `AUTH_STORAGE_STATE_B64` is required for authenticated app surfaces. Code intelligence is currently a local-only input: set `SOURCE_REPO_PATH` to the local project directory. Git metadata is used when available; the extracted ZIP is scanned as a local source tree.
+
+For private FE/BE repositories, configure `SOURCE_REPOSITORY_TOKEN` as a read-only GitHub Secret with access to both source repositories. The workflow checks out the configured frontend and backend refs before generating cases, so every run analyzes fresh source instead of a stale copy. Set `FRONTEND_REPOSITORY`, `FRONTEND_REF`, `BACKEND_REPOSITORY`, and `BACKEND_REF` as repository variables when the defaults differ. The workflow also accepts the `source-repository-updated` `repository_dispatch` event; source repositories can call it after a push when immediate QA is desired. The existing schedule remains the fallback.
 
 The workflow supports both browser modes. Leave `headed=false` for a normal headless CI run; choose `headed=true` to run Chromium under `xvfb` with a virtual display. CI cannot show a physical browser window on your computer, but both modes produce the same artifacts for inspection.
 
@@ -133,6 +145,7 @@ The workflow still uploads the normal Playwright screenshots, videos, traces, an
 - `docs/OKR_DELIVERY_REPORT.md`: OKR teslim raporu, son kosum metrikleri ve sonraki fazlar.
 - `docs/HANDOFF_GUIDE.md`: lokal ve GitHub Actions calistirma rehberi.
 - `docs/EVIDENCE_INDEX.md`: son kosum screenshot ve video kanitlarinin index'i.
+- `skills/release-exploratory-qa/`: reusable skill package for the wider QA group.
 - `artifacts/generated-cases.md`: lead ve rapor incelemesi icin okunabilir case ozeti.
 - `artifacts/generated-cases.html`: ayni ozetin tarayicida sunuma uygun gorunumu.
 - `artifacts/task-<issue-key>.html`: tek Jira taski icin acceptance criteria ve taska bagli case raporu.
